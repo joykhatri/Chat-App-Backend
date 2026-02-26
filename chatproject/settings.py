@@ -126,8 +126,8 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql', 
         'NAME': 'chat_app',
-        'USER': 'root',
-        'PASSWORD': 'Joy@0912',
+        'USER': 'Your_USERNAME',
+        'PASSWORD': 'Your_PASSWORD',
         'HOST': 'localhost',
         'PORT': '3306',
     }
@@ -160,3 +160,4 @@ SIMPLE_JWT = {
 
 
 AUTH_USER_MODEL = "chatapp.User"
+
