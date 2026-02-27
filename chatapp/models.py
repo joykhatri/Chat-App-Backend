@@ -34,7 +34,8 @@ class ChatMember(models.Model):
 
 class Message(models.Model):
     chat_id = models.ForeignKey(Chat, on_delete=models.CASCADE, related_name="messages")
-    sender_id = models.ForeignKey(User, on_delete=models.CASCADE)
+    sender_id = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sent_messages")
+    receiver_id = models.ForeignKey(User, on_delete=models.CASCADE, related_name="received_messages")
     message = models.TextField()
     type = models.CharField(max_length=25, choices=[
         ('text', 'Text'),
