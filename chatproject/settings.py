@@ -73,6 +73,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'chatproject.wsgi.application'
+ASGI_APPLICATION = 'chatproject.asgi.application'
 
 
 # Database
@@ -161,3 +162,9 @@ SIMPLE_JWT = {
 
 AUTH_USER_MODEL = "chatapp.User"
 
+
+CHANNEL_LAYERS ={
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
+    }
+}
