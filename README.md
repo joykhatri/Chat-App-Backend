@@ -74,8 +74,8 @@ python manage.py runserver
 
 ### ASGI/Daphne server (for WebSocket):
 ```bash
-$env:DJANGO_SETTINGS_MODULE="project.settings"   # Windows PowerShell
-daphne -p 8000 project.asgi:application
+$env:DJANGO_SETTINGS_MODULE="chatproject.settings"   # Windows PowerShell
+daphne -p 8000 chatproject.asgi:application
 ```
 
 ## 🔑 API Endpoints
