@@ -85,7 +85,7 @@ daphne -p 8000 chatproject.asgi:application
 | ------ | --------------------------------------------------- | ---------------------------------------- |
 | POST   | `/api/register/`                                    | User Registration                        |
 | POST   | `/api/login/`                                       | User Login                               |
-| POST   | `/api/logout/`                                      | User Logout (Enter JWT access token for logout) |
+| POST   | `/api/logout/`                                      | User Logout                              |
 | GET    | `/api/profile/`                                     | Get Profile info                         |
 | GET    | `/api/users/`                                       | Get User List                            |
 | GET    | `/api/users/{id}/`                                  | Get User Profile info with Id            |
@@ -114,6 +114,17 @@ daphne -p 8000 chatproject.asgi:application
 ```bash
 Use access token in Authorization header for protected endpoints:
 Authorization: Bearer <access_token>
+```
+
+### Logout
+```bash
+{
+    "refresh_token": "Your Refresh Token"
+}
+
+- Use access token in Authorization header for protected endpoints:
+Authorization: Bearer <access_token>
+- Use refresh token in payload for Logout
 ```
 
 ## 🌐 WebSocket Endpoints
