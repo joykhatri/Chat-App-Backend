@@ -81,3 +81,44 @@ daphne -p 8000 chatproject.asgi:application
 ## 🔑 API Endpoints
 
 ### Authentication Module
+| Method | Endpoint                                            | Description                              |
+| ------ | --------------------------------------------------- | ---------------------------------------- |
+| POST   | `/api/register/`                                    | User Registration                        |
+| POST   | `/api/login/`                                       | User Login                               |
+| POST   | `/api/logout/`                                      | User Logout (Enter JWT access token for logout) |
+| GET    | `/api/profile/`                                     | Get Profile info                         |
+| GET    | `/api/users/`                                       | Get User List                            |
+| GET    | `/api/users/{id}/`                                  | Get User Profile info with Id            |
+| GET    | `/api/users/?name=demo`                             | Search Users                             |
+| GET    | `/api/users/online/`                                | Get Online Users Info                    |
+
+
+### Register
+```bash
+{
+    "name": "demo",
+    "email": "demo@gmail.com",
+    "password": "demo@123",
+    "is_online": true
+}
+```
+
+### Login
+```bash
+{
+    "email": "demo@gmail.com",
+    "password": "demo@123"
+}
+```
+- Returns access and refresh tokens
+```bash
+Use access token in Authorization header for protected endpoints:
+Authorization: Bearer <access_token>
+```
+
+## 🌐 WebSocket Endpoints
+
+### For Chat
+```bash
+ws://127.0.0.1:8000/ws/chat/1/?user_id={id}
+```
