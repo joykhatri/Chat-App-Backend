@@ -322,6 +322,74 @@ class ChatViewSet(viewsets.ModelViewSet):
             "data": None
         }, status=status.HTTP_400_BAD_REQUEST)
     
+    @action(detail=True, methods=['get'], url_path='messages')
+    def get_messages(self, request, pk=None):
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return Response({
+                "status": False,
+                "message": "Authentication credentials were not provided.",
+                "data": None
+            }, status=status.HTTP_401_UNAUTHORIZED)
+        
+        try:
+            chat = Chat.objects.get(pk=pk)
+        except Chat.DoesNotExist:
+            return Response({
+                "status": False,
+                "message": f"Chat with id {pk} does not exist",
+                "data": None
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        if not ChatMember.objects.filter(chat_id_id=chat, user_id_id=user).exists():
+            return Response({
+                "status": False,
+                "messages": "You are not a member of this chat.",
+                "data": None
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        messages = Message.objects.filter(chat_id_id=chat).order_by("-created_at")
+        
+        serializer = MessageSerializer(messages, many=True)
+        return Response({
+            "status": True,
+            "message": "Your chat is",
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
+    
+    def destroy(self, request, pk=None):
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return Response({
+                "status": False,
+                "message": "Authentication credentials were not provided.",
+                "data": None
+            }, status=status.HTTP_401_UNAUTHORIZED)
+        
+        try:
+            chat = Chat.objects.get(pk=pk)
+        except Chat.DoesNotExist:
+            return Response({
+                "status": False,
+                "message": f"Chat with id {pk} does not exist",
+                "data": None
+            }, status=status.HTTP_404_NOT_FOUND)
+    
+        if not ChatMember.objects.filter(chat_id_id=chat, user_id_id=user).exists():
+            return Response({
+                "status": False,
+                "message": "You are not a member of this chat",
+                "data": None
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        chat.delete()
+        return Response({
+            "status": True,
+            "message": "Chat deleted successfully",
+            "data": None
+        }, status=status.HTTP_200_OK)
 
 class MessageViewSet(viewsets.ModelViewSet):
     queryset = Message.objects.all()

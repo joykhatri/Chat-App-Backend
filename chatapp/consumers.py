@@ -53,15 +53,22 @@ class ChatConsumer(AsyncWebsocketConsumer):
         event = data.get("event")
 
         if event == "send_message":
+            chat_id = data.get("chat_id")
+            if not chat_id:
+                chat_id = await self.create_personal_chat(
+                    self.user_id,
+                    data["receiver_id"]
+                )
+
             message_obj = await self.save_message(
-                chat_id = data["chat_id"],
+                chat_id = chat_id,
                 receiver_id = data["receiver_id"],
                 message_text = data["message"],
                 msg_type = data.get("type", "text")
             )
 
             await self.channel_layer.group_send(
-                f"chat_{data['chat_id']}",
+                f"chat_{chat_id}",
                 {
                     "type": "receive_message",
                     "message": message_obj
@@ -189,6 +196,27 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "timestamp": str(msg.created_at)
         }
     
+    @database_sync_to_async
+    def create_personal_chat(self, user_id1, user_id2):
+        from chatapp.models import User, Chat, ChatMember
+        from django.db.models import Count
+
+        user1_chats = ChatMember.objects.filter(user_id_id=user_id1).values_list("chat_id_id", flat=True)
+        user2_chats = ChatMember.objects.filter(user_id_id=user_id2).values_list("chat_id_id", flat=True)
+
+        chats = set(user1_chats).intersection(set(user2_chats))
+
+        if chats:
+            return list(chats)[0]
+
+        chat = Chat.objects.create(type="personal")
+        ChatMember.objects.bulk_create([
+            ChatMember(chat_id=chat, user_id_id=user_id1),
+            ChatMember(chat_id=chat, user_id_id=user_id2)
+            ])
+
+        return chat.id
+
     @database_sync_to_async
     def mark_message_delivered(self, message_id):
         from chatapp.models import Message

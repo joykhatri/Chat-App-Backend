@@ -22,12 +22,20 @@ class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
     password = serializers.CharField(write_only=True, required=True)
 
-class ChatSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Chat
-        fields = ['id', 'type', 'created_at']
-
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
         fields = ['id', 'chat_id', 'sender_id', 'message', 'type', 'created_at', 'is_read', 'is_delivered', 'is_deleted']
+
+class ChatMemberSerializer(serializers.ModelSerializer):
+    class Meta:
+        model : ChatMember
+        fields = "__all__"
+
+class ChatSerializer(serializers.ModelSerializer):
+    messages = MessageSerializer(many=True, read_only=True)
+    chat_member = ChatMemberSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Chat
+        fields = "__all__"
