@@ -91,6 +91,9 @@ daphne -p 8000 chatproject.asgi:application
 | GET    | `/api/users/{id}/`                                  | Get User Profile info with Id            |
 | GET    | `/api/users/?name=demo`                             | Search Users                             |
 | GET    | `/api/users/online/`                                | Get Online Users Info                    |
+| POST   | `/api/chat/start/`                                  | Start new Chat                           |
+| GET    | `/api/chat/{chat_id}/messages/`                     | All Messages                             |
+| DELETE   | `/api/chat/{chat_id}/`                            | Delete Chat                              |
 
 
 ### Register
@@ -127,9 +130,24 @@ Authorization: Bearer <access_token>
 - Use refresh token in payload for Logout
 ```
 
+### Start Chat
+```bash
+{
+    "type": "personal"
+}
+```
+
 ## 🌐 WebSocket Endpoints
 
 ### For Chat
 ```bash
-ws://127.0.0.1:8000/ws/chat/1/?user_id={id}
+ws://127.0.0.1:8000/ws/chat/{chat_id}/?user_id={id}
+
+- Message
+{
+    "event": "send_message",
+    "receiver_id": 2,
+    "message": "Hello",
+    "type": "text"
+}
 ```
