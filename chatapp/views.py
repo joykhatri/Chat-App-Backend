@@ -9,6 +9,10 @@ from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 
+#################################################################################
+################################# User View #####################################
+#################################################################################
+
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -148,6 +152,9 @@ class UserViewSet(viewsets.ModelViewSet):
             "data": serializer.data
         }, status=status.HTTP_200_OK)
 
+#################################################################################
+################################# Log in ########################################
+#################################################################################
 
 class LoginViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -211,6 +218,9 @@ class LoginViewSet(viewsets.ModelViewSet):
             }
         }, status=status.HTTP_200_OK)
     
+#################################################################################
+################################# Log out #######################################
+#################################################################################
 
 class LogoutViewSet(APIView):
     def post(self, request):
@@ -238,6 +248,9 @@ class LogoutViewSet(APIView):
                 "data": None
             }, status=status.HTTP_400_BAD_REQUEST)
         
+#################################################################################
+################################# Profile #######################################
+#################################################################################
 
 class ProfileViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -275,6 +288,9 @@ class ProfileViewSet(viewsets.ModelViewSet):
             "data": serializer.data
         }, status=status.HTTP_200_OK)
 
+#################################################################################
+################################# Chat ##########################################
+#################################################################################
 
 class ChatViewSet(viewsets.ModelViewSet):
     queryset = Chat.objects.all()
@@ -390,10 +406,14 @@ class ChatViewSet(viewsets.ModelViewSet):
             "message": "Chat deleted successfully",
             "data": None
         }, status=status.HTTP_200_OK)
+    
+#################################################################################
+################################# Group #########################################
+#################################################################################
 
-class MessageViewSet(viewsets.ModelViewSet):
-    queryset = Message.objects.all()
-    serializer_class = MessageSerializer
+class GroupViewSet(viewsets.ModelViewSet):
+    queryset = Group.objects.all()
+    serializer_class = GroupSerializer
 
     def create(self, request):
         data = request.data
@@ -405,66 +425,223 @@ class MessageViewSet(viewsets.ModelViewSet):
                 "message": "Authentication credentials were not provided.",
                 "data": None
             }, status=status.HTTP_401_UNAUTHORIZED)
-
-        chat_id = data.get("chat_id")
-        if not chat_id:
+        
+        name = data.get("name")
+        if not name:
             return Response({
                 "status": False,
-                "message": "chat_id field is required.",
-                "data": None
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        message = data.get("message")
-        if not message:
-            return Response({
-                "status": False,
-                "message": "Message field is required.",
-                "data": None
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        type = data.get("type")
-        if not type:
-            return Response({
-                "status": False,
-                "message": "Message type is required.",
+                "message": "Group Name is required.",
                 "data": None
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        allowed_message_types = ["text", "image", "video", "file"]
-        if type not in allowed_message_types:
-            return Response({
-                "status": False,
-                "message": f"Invalid message type. Allowed message type are {allowed_message_types}",
-                "data": None
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            chat = Chat.objects.get(id=chat_id)
-        except Chat.DoesNotExist:
-            return Response({
-                "status": False,
-                "message": "Chat does not exist.",
-                "data": None
-            }, status=status.HTTP_404_NOT_FOUND)
-        
-        if ChatMember.objects.filter(chat=chat, user=user).exists():
-            return Response({
-                "status": False,
-                "message": "You are not a member of this chat.",
-                "data": None
-            }, status=status.HTTP_403_FORBIDDEN)
-
-        serializer = MessageSerializer(data=request.data)
+        serializer = GroupSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            serializer.save(admin=user)
             return Response({
                 "status": True,
-                "message": "Message send successfully",
+                "message": "Group created successfully",
                 "data": serializer.data
             }, status=status.HTTP_201_CREATED)
-
+        
         return Response({
             "success": False,
             "message": serializer.errors,
             "data": None
         }, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['post'], url_path='add-member')
+    def add_member(self, request, pk=None):
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return Response({
+                "status": False,
+                "message": "Authentication credentials were not provided.",
+                "data": None
+            }, status=status.HTTP_401_UNAUTHORIZED)
+        
+        group = self.get_object()
+        
+        if group.admin != user:
+            return Response({
+                "status": False,
+                "message": "Only group admin can add members",
+                "data": None
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        member_id = request.data.get("user_id")
+
+        if not member_id:
+            return Response({
+                "status": False,
+                "message": "user_id is required",
+                "data": False
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            member = User.objects.get(id=member_id)
+        except User.DoesNotExist:
+            return Response({
+                "status": False,
+                "message": "User does not exist",
+                "data": None
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        if ChatMember.objects.filter(group=group, user_id=member).exists():
+            return Response({
+                "status": False,
+                "message": "User already exist",
+                "data": None
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        ChatMember.objects.create(group=group, user_id=member)
+
+        return Response({
+            "status": True,
+            "message": "Member added successfully",
+            "data": {
+                "group_id": group.id,
+                "user_id": member.id
+            }
+        }, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['post'], url_path='remove-member')
+    def remove_member(self, request, pk=None):
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return Response({
+                "status": False,
+                "message": "Authentication credentials were not provided.",
+                "data": None
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+        group = self.get_object()
+
+        if group.admin != user:
+            return Response({
+                "status": False,
+                "message": "Only group admin can add members",
+                "data": None
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        member_id = request.data.get("user_id")
+
+        if not member_id:
+            return Response({
+                "status": False,
+                "message": "user_id is required",
+                "data": False
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            member = User.objects.get(id=member_id)
+        except User.DoesNotExist:
+            return Response({
+                "status": False,
+                "message": "User does not exist",
+                "data": None
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        if member == group.admin:
+            return Response({
+                "status": False,
+                "message": "Admin cannot remove himself",
+                "data": None
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        chat_member = ChatMember.objects.filter(group=group, user_id=member)
+
+        if not chat_member.exists():
+            return Response({
+                "status": False,
+                "data": "User is not member of this group",
+                "data": None
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        chat_member.delete()
+        return Response({
+            "status": True,
+            "message": "Member removed successfully",
+            "data": {
+                "group_id": group.id,
+                "user_id": member.id
+            }
+        }, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['get'], url_path='messages')
+    def get_messages(self, request, pk=None):
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return Response({
+                "status": False,
+                "message": "Authentication credentials were not provided.",
+                "data": None
+            }, status=status.HTTP_401_UNAUTHORIZED)
+        
+        group = self.get_object()
+
+        is_member = ChatMember.objects.filter(group=group, user_id=user).exists()
+        if not is_member:
+            return Response({
+                "status": False,
+                "message": "You are not a member of this group",
+                "data": None
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        chat_member = ChatMember.objects.filter(group=group).first()
+        chat = chat_member.chat_id
+        messages = Message.objects.filter(chat_id=chat).order_by('created_at')
+
+        data = []
+        for msg in messages:
+            data.append({
+                "id": msg.id,
+                "sender_id": msg.sender_id,
+                "message": msg.message,
+                "type": msg.type,
+                "created_at": msg.created_at,
+                "is_read": msg.is_read,
+                "is_delivered": msg.is_delivered,
+            })
+
+        return Response({
+            "status": True,
+            "message": "Messages fetched successfully",
+            "data": data
+        }, status=status.HTTP_200_OK)
+
+    def destroy(self, request, pk=None):
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return Response({
+                "status": False,
+                "message": "Authentication credentials were not provided.",
+                "data": None
+            }, status=status.HTTP_401_UNAUTHORIZED)
+        
+        try:
+            group = Group.objects.get(pk=pk)
+        except Group.DoesNotExist:
+            return Response({
+                "status": False,
+                "message": "Group not found",
+                "data": None
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        if group.admin != user:
+            return Response({
+                "status": False,
+                "message": "Only group admin can delete this group",
+                "data": None
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        group.delete()
+
+        return Response({
+            "status": True,
+            "message": "Group deleted successfully",
+            "data": None
+        }, status=status.HTTP_200_OK)

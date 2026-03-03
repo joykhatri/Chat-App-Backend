@@ -42,6 +42,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }
         )
 
+        message_info = await self.mark_undelivered_message(self.user_id)
+        for msg in message_info:
+            await self.channel_layer.group_send(
+                f"user_{msg['sender_id']}",
+                {
+                    "type": "message_delivered",
+                    "message_id": msg["message_id"]
+                }
+            )
+
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(
             self.group_name,
@@ -171,6 +181,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return None
 
     @database_sync_to_async
+    def mark_undelivered_message(self, user_id):
+        from chatapp.models import Message
+
+        undelivered_message = Message.objects.filter(
+            receiver_id = user_id,
+            is_delivered = False
+        )
+        messages = list(undelivered_message.values("id", "sender_id"))
+        undelivered_message.update(is_delivered=True)
+
+        return[
+            {
+                "message_id": msg["id"],
+                "sender_id": msg["sender_id"]
+            }
+            for msg in messages
+        ]
+
+    @database_sync_to_async
     def save_message(self, chat_id, message_text, receiver_id, msg_type="text"):
         from chatapp.models import Message, Chat, User
         from django.utils.timezone import now
@@ -198,8 +227,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     
     @database_sync_to_async
     def create_personal_chat(self, user_id1, user_id2):
-        from chatapp.models import User, Chat, ChatMember
-        from django.db.models import Count
+        from chatapp.models import Chat, ChatMember
 
         user1_chats = ChatMember.objects.filter(user_id_id=user_id1).values_list("chat_id_id", flat=True)
         user2_chats = ChatMember.objects.filter(user_id_id=user_id2).values_list("chat_id_id", flat=True)

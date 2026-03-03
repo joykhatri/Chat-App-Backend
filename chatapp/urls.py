@@ -9,6 +9,7 @@ router.register('login', LoginViewSet, basename="login")
 router.register('profile', ProfileViewSet, basename="profile")
 router.register('chat/start', ChatViewSet, basename="start_chat")
 router.register('chat', ChatViewSet, basename="view_chat")
+router.register('group/create', GroupViewSet, basename="create_group")
 urlpatterns = [
     path('logout/', LogoutViewSet.as_view(), name="logout")
 ]
