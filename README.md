@@ -93,8 +93,12 @@ daphne -p 8000 chatproject.asgi:application
 | GET    | `/api/users/online/`                                | Get Online Users Info                    |
 | POST   | `/api/chat/start/`                                  | Start new Chat                           |
 | GET    | `/api/chat/{chat_id}/messages/`                     | All Messages                             |
-| DELETE   | `/api/chat/{chat_id}/`                            | Delete Chat                              |
-
+| DELETE | `/api/chat/{chat_id}/`                              | Delete Chat                              |
+| POST   | `/api/group/create/`                                | Create Group                             |
+| POST   | `/api/group/create/{group_id}/add-member/`          | Add Members in Group                     |
+| POST   | `/api/group/create/{group_id}/remove-member/`       | Add Members from Group                   |
+| GET    | `/api/group/create/{group_id}/messages/`            | Fetch Group Messages                     |
+| DELETE | `/api/group/create/{group_id}/`                     | Delete Group                             |
 
 ### Register
 ```bash
@@ -134,6 +138,20 @@ Authorization: Bearer <access_token>
 ```bash
 {
     "type": "personal"
+}
+```
+
+### Create Group
+```bash
+{
+  "name": "Demo Group"
+}
+```
+
+### Add/Remove Member
+```bash
+{
+  "user_id": 1
 }
 ```
 
