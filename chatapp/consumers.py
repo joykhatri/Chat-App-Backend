@@ -203,7 +203,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def save_message(self, chat_id, message_text, receiver_id, msg_type="text"):
         from chatapp.models import Message, Chat, User
         from django.utils.timezone import now
-
+        
         chat = Chat.objects.get(id=chat_id)
         sender = User.objects.get(id=self.user_id)
         receiver = User.objects.get(id=receiver_id)
