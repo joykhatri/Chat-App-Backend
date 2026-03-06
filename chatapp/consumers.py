@@ -23,11 +23,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         self.user_group_name = f"user_{self.user_id}"
         await self.channel_layer.group_add(
-            self.user_group_name,
-            self.channel_name
-        )
-
-        await self.channel_layer.group_add(
                 self.group_name,
                 self.channel_name
             )
@@ -63,7 +58,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         event = data.get("event")
 
         if event == "send_message":
-            chat_id = data.get("chat_id")
+            chat_id = self.chat_id
+
             if not chat_id:
                 chat_id = await self.create_personal_chat(
                     self.user_id,
