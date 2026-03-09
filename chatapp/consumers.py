@@ -36,17 +36,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "user_id": self.user_id
             }
         )
-
-        message_info = await self.mark_undelivered_message(self.user_id)
-        for msg in message_info:
-            await self.channel_layer.group_send(
-                f"user_{msg['sender_id']}",
-                {
-                    "type": "message_delivered",
-                    "message_id": msg["message_id"]
-                }
-            )
-
+        
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(
             self.group_name,
@@ -66,9 +56,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     data["receiver_id"]
                 )
 
+            receiver_ids = await self.get_chat_receivers(chat_id)
+
             message_obj = await self.save_message(
                 chat_id = chat_id,
-                receiver_id = data["receiver_id"],
+                receiver_ids = receiver_ids,
                 message_text = data["message"],
                 msg_type = data.get("type", "text")
             )
@@ -81,16 +73,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
 
-            is_online = await self.is_user_online(data["receiver_id"])
-            if is_online:
-                await self.mark_message_delivered(message_obj["message_id"])
-                await self.channel_layer.group_send(
-                    f"user_{self.user_id}",
-                    {
-                        "type": "message_delivered",
-                        "message_id": message_obj["message_id"]
-                    }
-                )
+            for receiver_id in receiver_ids:
+                is_online = await self.is_user_online(receiver_id)
+                if is_online:
+                    await self.mark_message_delivered(message_obj["message_id"])
+                    await self.channel_layer.group_send(
+                        f"user_{receiver_id}",
+                        {
+                            "type": "message_delivered",
+                            "message_id": message_obj["message_id"]
+                        }
+                    )
 
         elif event == "typing":
             await self.channel_layer.group_send(
@@ -176,51 +169,38 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except User.DoesNotExist:
             return None
 
+    
     @database_sync_to_async
-    def mark_undelivered_message(self, user_id):
-        from chatapp.models import Message
-
-        undelivered_message = Message.objects.filter(
-            receiver_id = user_id,
-            is_delivered = False
-        )
-        messages = list(undelivered_message.values("id", "sender_id"))
-        undelivered_message.update(is_delivered=True)
-
-        return[
-            {
-                "message_id": msg["id"],
-                "sender_id": msg["sender_id"]
-            }
-            for msg in messages
-        ]
-
-    @database_sync_to_async
-    def save_message(self, chat_id, message_text, receiver_id, msg_type="text"):
+    def save_message(self, chat_id, receiver_ids, message_text, msg_type="text"):
         from chatapp.models import Message, Chat, User
         from django.utils.timezone import now
         
         chat = Chat.objects.get(id=chat_id)
         sender = User.objects.get(id=self.user_id)
-        receiver = User.objects.get(id=receiver_id)
 
-        msg = Message.objects.create(
-            chat_id = chat,
-            sender_id = sender,
-            receiver_id = receiver,
-            message = message_text,
-            type = msg_type,
-            created_at = now()
-        )
+        messages = []
+        for receiver_id in receiver_ids:
+            receiver = User.objects.get(id=receiver_id)
 
-        return{
-            "message_id": msg.id,
-            "sender_id": sender.id,
-            "chat_id": chat.id,
-            "message": msg.message,
-            "timestamp": str(msg.created_at)
-        }
-    
+            msg = Message.objects.create(
+                chat_id = chat,
+                sender_id = sender,
+                receiver_id = receiver,
+                message = message_text,
+                type = msg_type,
+                created_at = now()
+            )
+
+            messages.append({
+                "message_id": msg.id,
+                "sender_id": sender.id,
+                "receiver_id": receiver_id,
+                "chat_id": chat.id,
+                "message": msg.message,
+                "timestamp": str(msg.created_at)
+            })
+        return messages[0] if messages else None
+
     @database_sync_to_async
     def create_personal_chat(self, user_id1, user_id2):
         from chatapp.models import Chat, ChatMember
@@ -260,3 +240,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def mark_user_offline(self, user_id):
         from chatapp.models import User
         User.objects.filter(id=user_id).update(is_online=False)
+
+    @database_sync_to_async
+    def get_chat_receivers(self, chat_id):
+        from chatapp.models import ChatMember
+        members = ChatMember.objects.filter(chat_id_id=chat_id).exclude(user_id_id=self.user_id)
+        return[member.user_id_id for member in members]

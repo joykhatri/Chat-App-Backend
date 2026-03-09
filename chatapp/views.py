@@ -592,13 +592,13 @@ class GroupViewSet(viewsets.ModelViewSet):
         
         chat_member = ChatMember.objects.filter(group=group).first()
         chat = chat_member.chat_id
-        messages = Message.objects.filter(chat_id=chat).order_by('created_at')
+        messages = Message.objects.filter(chat_id=chat).order_by('-created_at')
 
         data = []
         for msg in messages:
             data.append({
                 "id": msg.id,
-                "sender_id": msg.sender_id,
+                "sender_id": msg.sender_id.id,
                 "message": msg.message,
                 "type": msg.type,
                 "created_at": msg.created_at,
