@@ -164,7 +164,6 @@ ws://127.0.0.1:8000/ws/chat/{chat_id}/?user_id={id}
 - Message
 {
     "event": "send_message",
-    "receiver_id": 2,
     "message": "Hello",
     "type": "text"
 }
