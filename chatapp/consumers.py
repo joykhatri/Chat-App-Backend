@@ -246,3 +246,105 @@ class ChatConsumer(AsyncWebsocketConsumer):
         from chatapp.models import ChatMember
         members = ChatMember.objects.filter(chat_id_id=chat_id).exclude(user_id_id=self.user_id)
         return[member.user_id_id for member in members]
+
+
+class HomeScreenConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        query_params = self.scope["query_string"].decode()
+        params = dict(q.split("=") for q in query_params.split("&"))
+        self.user_id = int(params.get("user_id"))
+
+        self.user_group_name = f"user_{self.user_id}"
+        await self.channel_layer.group_add(self.user_group_name, self.channel_name)
+
+        await self.accept()
+
+        await self.mark_user_online(self.user_id)
+
+        chats = await self.get_user_chats(self.user_id)
+        await self.send(text_data=json.dumps({
+            "event": "home_screen",
+            "data": chats
+        }))
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(
+            self.user_group_name,
+            self.channel_layer
+        )
+        await self.mark_user_offline(self.user_id)
+
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+        event = data.get("event")
+
+        if event == "message_read":
+            await self.mark_message_read(data["message_id"])
+            await self.send(text_data=json.dumps({
+                "event": "message_read",
+                "message_id": data["message_id"]
+            }))
+
+    async def new_message(self, event):
+        await self.send(text_data=json.dumps({
+            "event": "new_message",
+            "data": event["message"]
+        }))
+
+    async def user_online(self, event):
+        await self.send(text_data=json.dumps({
+            "event": "user_online",
+            "data": event["user_id"]
+        }))
+
+    async def user_offline(self, event):
+        await self.send(text_data=json.dumps({
+            "event": "user_offline",
+            "data": event["user_id"]
+        }))
+
+    @database_sync_to_async
+    def get_user_chats(self, user_id):
+        from chatapp.models import ChatMember, Message, User
+
+        chat_ids = ChatMember.objects.filter(user_id_id=user_id).values_list('chat_id_id', flat=True)
+        chat_data = []
+
+        for chat_id in chat_ids:
+            last_msg = Message.objects.filter(chat_id_id=chat_id).order_by('-created_at').first()
+            if last_msg:
+                other_members = ChatMember.objects.filter(chat_id_id=chat_id).exclude(user_id_id=user_id)
+                member_info = []
+                for m in other_members:
+                    user = User.objects.get(id=m.user_id_id)
+                    member_info.append({
+                        "id": user.id,
+                        "user": user.name,
+                        "is_online": user.is_online
+                    })
+
+                unread_messages = Message.objects.filter(chat_id_id=chat_id, receiver_id_id=user_id, is_read=False).count()
+
+                chat_data.append({
+                    "chat_id": chat_id,
+                    "last_message": last_msg.message,
+                    "timestamp": str(last_msg.created_at),
+                    "senders": member_info,
+                    "unread_messages": unread_messages
+                })
+        return chat_data
+    
+    @database_sync_to_async
+    def mark_message_read(self, message_id):
+        from chatapp.models import Message
+        Message.objects.filter(id=message_id).update(is_read=True)
+
+    @database_sync_to_async
+    def mark_user_online(self, user_id):
+        from chatapp.models import User
+        User.objects.filter(id=user_id).update(is_online=True)
+
+    @database_sync_to_async
+    def mark_user_offline(self, user_id):
+        from chatapp.models import User
+        User.objects.filter(id=user_id).update(is_online=False)
