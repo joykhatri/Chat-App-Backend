@@ -168,3 +168,9 @@ ws://127.0.0.1:8000/ws/chat/{chat_id}/?user_id={id}
     "type": "text"
 }
 ```
+
+### Show all Chat
+```bash
+ws://127.0.0.1:8000/ws/homescreen/?user_id={id}
+```
+- Shows user all chat (Home Screen)
