@@ -8,6 +8,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 #################################################################################
 ################################# User View #####################################
@@ -436,7 +438,19 @@ class GroupViewSet(viewsets.ModelViewSet):
         
         serializer = GroupSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(admin=user)
+            group = serializer.save(admin=user)
+
+            from chatapp.models import Chat
+            chat = Chat.objects.create(type="group")
+            group.chat = chat
+            group.save()
+            ChatMember.objects.create(chat_id=chat, user_id=user, group=group)
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f"user_{user.id}",
+                {"type": "new_chat"}
+            )
+
             return Response({
                 "status": True,
                 "message": "Group created successfully",
@@ -487,6 +501,15 @@ class GroupViewSet(viewsets.ModelViewSet):
                 "data": None
             }, status=status.HTTP_404_NOT_FOUND)
         
+        chat_member = ChatMember.objects.filter(group=group).first()
+        if not chat_member:
+            return Response({
+                "status": False,
+                "message": "Chat not found",
+                "data": None
+            }, status=status.HTTP_400_BAD_REQUEST)
+        chat = chat_member.chat_id
+
         if ChatMember.objects.filter(group=group, user_id=member).exists():
             return Response({
                 "status": False,
@@ -494,13 +517,32 @@ class GroupViewSet(viewsets.ModelViewSet):
                 "data": None
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        ChatMember.objects.create(group=group, user_id=member)
+        ChatMember.objects.create(chat_id=chat, group=group, user_id=member)
+        channel_layer = get_channel_layer()
+
+        async_to_sync(channel_layer.group_send)(
+            f"chat_{chat.id}",
+            {
+                "type": "member_added",
+                "user_name": member.name,
+                "chat_id": chat.id
+            }
+        )
+
+        async_to_sync(channel_layer.group_send)(
+            f"user_{member.id}",
+            {
+                "type": "added_to_group",
+                "chat_id": chat.id
+            }
+        )
 
         return Response({
             "status": True,
             "message": "Member added successfully",
             "data": {
                 "group_id": group.id,
+                "chat_id": chat.id,
                 "user_id": member.id
             }
         }, status=status.HTTP_200_OK)
@@ -550,16 +592,35 @@ class GroupViewSet(viewsets.ModelViewSet):
                 "data": None
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        chat_member = ChatMember.objects.filter(group=group, user_id=member)
+        chat_member = ChatMember.objects.filter(group=group, user_id=member).first()
 
-        if not chat_member.exists():
+        if not chat_member:
             return Response({
                 "status": False,
                 "data": "User is not member of this group",
                 "data": None
             }, status=status.HTTP_400_BAD_REQUEST)
         
+        chat = chat_member.chat_id
         chat_member.delete()
+        channel_layer = get_channel_layer()
+
+        async_to_sync(channel_layer.group_send)(
+            f"chat_{chat.id}",
+            {
+                "type": "member_removed",
+                "user_name": member.name,
+                "chat_id": chat.id
+            }
+        )
+
+        async_to_sync(channel_layer.group_send)(
+            f"user_{member.id}",
+            {
+                "type": "removed_from_group",
+                "chat_id": chat.id
+            }
+        )
         return Response({
             "status": True,
             "message": "Member removed successfully",

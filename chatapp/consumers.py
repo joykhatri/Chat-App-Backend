@@ -73,6 +73,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
 
+            await self.channel_layer.group_send(
+                f"user_{self.user_id}",
+                {
+                    "type": "new_message"
+                }
+            )
+
+            for receiver_id in receiver_ids:
+                await self.channel_layer.group_send(
+                    f"user_{receiver_id}",
+                    {
+                        "type": "new_message"
+                    }
+                )
+
             for receiver_id in receiver_ids:
                 is_online = await self.is_user_online(receiver_id)
                 if is_online:
@@ -93,7 +108,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "user_id": self.scope["user"].id,
                     "is_typing": data["is_typing"]
                 }
-            )  
+            )
 
         elif event == "message_read":
             sender_id = await self.mark_message_read(data["message_id"])
@@ -210,8 +225,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         chats = set(user1_chats).intersection(set(user2_chats))
 
-        if chats:
-            return list(chats)[0]
+        for chat_id in chats:
+            chat = Chat.objects.get(id=chat_id)
+            if chat.type == "personal":
+                return chat.id
 
         chat = Chat.objects.create(type="personal")
         ChatMember.objects.bulk_create([
@@ -257,6 +274,10 @@ class HomeScreenConsumer(AsyncWebsocketConsumer):
         self.user_group_name = f"user_{self.user_id}"
         await self.channel_layer.group_add(self.user_group_name, self.channel_name)
 
+        chat_ids = await self.get_user_chat_ids(self.user_id)
+        for chat_id in chat_ids:
+            await self.channel_layer.group_add(f"chat_{chat_id}", self.channel_name)
+
         await self.accept()
 
         await self.mark_user_online(self.user_id)
@@ -270,7 +291,7 @@ class HomeScreenConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(
             self.user_group_name,
-            self.channel_layer
+            self.channel_name
         )
         await self.mark_user_offline(self.user_id)
 
@@ -285,10 +306,58 @@ class HomeScreenConsumer(AsyncWebsocketConsumer):
                 "message_id": data["message_id"]
             }))
 
-    async def new_message(self, event):
+    async def receive_message(self, event):
         await self.send(text_data=json.dumps({
-            "event": "new_message",
+            "event": "receive_message",
             "data": event["message"]
+        }))
+
+    async def message_delivered(self, event):
+        await self.send(text_data=json.dumps({
+            "event": "message_delivered",
+            "message_id": event["message_id"]
+        }))
+
+    async def new_chat(self, event):
+        chats = await self.get_user_chats(self.user_id)
+        await self.send(text_data=json.dumps({
+            "event": "home_screen",
+            "data": chats
+        }))
+
+    async def member_added(self, event):
+        await self.send(text_data=json.dumps({
+            "event": "member_added",
+            "message": f"{event['user_name']} joined the group",
+            "chat_id": event["chat_id"]
+        }))
+
+    async def added_to_group(self, event):
+        await self.send(text_data=json.dumps({
+            "event": "added_to_group",
+            "message": f"You were added to group",
+            "chat_id": event["chat_id"]
+        }))
+
+    async def member_removed(self, event):
+        await self.send(text_data=json.dumps({
+            "event": "member_removed",
+            "message": f"{event['user_name']} left the group",
+            "chat_id": event["chat_id"]
+        }))
+
+    async def removed_from_group(self, event):
+        await self.send(text_data=json.dumps({
+            "event": "removed_from_group",
+            "message": "You were removed from group",
+            "chat_id": event["chat_id"]
+        }))
+
+    async def new_message(self, event):
+        chats = await self.get_user_chats(self.user_id)
+        await self.send(text_data=json.dumps({
+            "event": "home_screen",
+            "data": chats
         }))
 
     async def user_online(self, event):
@@ -302,6 +371,11 @@ class HomeScreenConsumer(AsyncWebsocketConsumer):
             "event": "user_offline",
             "data": event["user_id"]
         }))
+
+    @database_sync_to_async
+    def get_user_chat_ids(self, user_id):
+        from chatapp.models import ChatMember
+        return list(ChatMember.objects.filter(user_id_id=user_id).values_list("chat_id_id", flat=True))
 
     @database_sync_to_async
     def get_user_chats(self, user_id):
@@ -328,9 +402,9 @@ class HomeScreenConsumer(AsyncWebsocketConsumer):
                 chat_data.append({
                     "chat_id": chat_id,
                     "last_message": last_msg.message,
+                    "unread_messages": unread_messages,
                     "timestamp": str(last_msg.created_at),
-                    "senders": member_info,
-                    "unread_messages": unread_messages
+                    # "senders": member_info,
                 })
         return chat_data
     
