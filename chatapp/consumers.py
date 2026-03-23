@@ -3,6 +3,7 @@ from urllib.parse import parse_qs
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.utils.timezone import now
+from datetime import datetime
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -274,13 +275,13 @@ class HomeScreenConsumer(AsyncWebsocketConsumer):
         self.user_group_name = f"user_{self.user_id}"
         await self.channel_layer.group_add(self.user_group_name, self.channel_name)
 
-        chat_ids = await self.get_user_chat_ids(self.user_id)
-        for chat_id in chat_ids:
-            await self.channel_layer.group_add(f"chat_{chat_id}", self.channel_name)
+        # chat_ids = await self.get_user_chat_ids(self.user_id)
+        # for chat_id in chat_ids:
+        #     await self.channel_layer.group_add(f"chat_{chat_id}", self.channel_name)
 
         await self.accept()
 
-        await self.mark_user_online(self.user_id)
+        # await self.mark_user_online(self.user_id)
 
         chats = await self.get_user_chats(self.user_id)
         await self.send(text_data=json.dumps({
@@ -293,7 +294,7 @@ class HomeScreenConsumer(AsyncWebsocketConsumer):
             self.user_group_name,
             self.channel_name
         )
-        await self.mark_user_offline(self.user_id)
+        # await self.mark_user_offline(self.user_id)
 
     async def receive(self, text_data):
         data = json.loads(text_data)
@@ -306,17 +307,20 @@ class HomeScreenConsumer(AsyncWebsocketConsumer):
                 "message_id": data["message_id"]
             }))
 
-    async def receive_message(self, event):
-        await self.send(text_data=json.dumps({
-            "event": "receive_message",
-            "data": event["message"]
-        }))
+    # async def receive_message(self, event):
+    #     await self.send(text_data=json.dumps({
+    #         "event": "receive_message",
+    #         "data": event["message"]
+    #     }))
+
+    # async def message_delivered(self, event):
+    #     await self.send(text_data=json.dumps({
+    #         "event": "message_delivered",
+    #         "message_id": event["message_id"]
+    #     }))
 
     async def message_delivered(self, event):
-        await self.send(text_data=json.dumps({
-            "event": "message_delivered",
-            "message_id": event["message_id"]
-        }))
+        pass
 
     async def new_chat(self, event):
         chats = await self.get_user_chats(self.user_id)
@@ -326,32 +330,56 @@ class HomeScreenConsumer(AsyncWebsocketConsumer):
         }))
 
     async def member_added(self, event):
+        chats = await self.get_user_chats(self.user_id)
+
         await self.send(text_data=json.dumps({
-            "event": "member_added",
-            "message": f"{event['user_name']} joined the group",
-            "chat_id": event["chat_id"]
+            "event": "home_screen",
+            "data": chats
         }))
+        # await self.send(text_data=json.dumps({
+        #     "event": "member_added",
+        #     "message": f"{event['user_name']} joined the group",
+        #     "chat_id": event["chat_id"]
+        # }))
 
     async def added_to_group(self, event):
+        chats = await self.get_user_chats(self.user_id)
+
         await self.send(text_data=json.dumps({
-            "event": "added_to_group",
-            "message": f"You were added to group",
-            "chat_id": event["chat_id"]
+            "event": "home_screen",
+            "data": chats
         }))
+    #     await self.send(text_data=json.dumps({
+    #         "event": "added_to_group",
+    #         "message": f"You were added to group",
+    #         "chat_id": event["chat_id"]
+    #     }))
 
     async def member_removed(self, event):
+        chats = await self.get_user_chats(self.user_id)
+
         await self.send(text_data=json.dumps({
-            "event": "member_removed",
-            "message": f"{event['user_name']} left the group",
-            "chat_id": event["chat_id"]
+            "event": "home_screen",
+            "data": chats
         }))
+        # await self.send(text_data=json.dumps({
+        #     "event": "member_removed",
+        #     "message": f"{event['user_name']} left the group",
+        #     "chat_id": event["chat_id"]
+        # }))
 
     async def removed_from_group(self, event):
+        chats = await self.get_user_chats(self.user_id)
+
         await self.send(text_data=json.dumps({
-            "event": "removed_from_group",
-            "message": "You were removed from group",
-            "chat_id": event["chat_id"]
+            "event": "home_screen",
+            "data": chats
         }))
+    #     await self.send(text_data=json.dumps({
+    #         "event": "removed_from_group",
+    #         "message": "You were removed from group",
+    #         "chat_id": event["chat_id"]
+    #     }))
 
     async def new_message(self, event):
         chats = await self.get_user_chats(self.user_id)
@@ -360,17 +388,35 @@ class HomeScreenConsumer(AsyncWebsocketConsumer):
             "data": chats
         }))
 
-    async def user_online(self, event):
+    async def group_deleted(self, event):
+        chats = await self.get_user_chats(self.user_id)
+
         await self.send(text_data=json.dumps({
-            "event": "user_online",
-            "data": event["user_id"]
+            "event": "home_screen",
+            "data": chats
         }))
+        # await self.send(text_data=json.dumps({
+        #     "event": "group_deleted",
+        #     "chat_id": event["chat_id"]
+        # }))
+
+    # async def user_online(self, event):
+    #     await self.send(text_data=json.dumps({
+    #         "event": "user_online",
+    #         "data": event["user_id"]
+    #     }))
+
+    async def user_online(self, event):
+        pass
 
     async def user_offline(self, event):
-        await self.send(text_data=json.dumps({
-            "event": "user_offline",
-            "data": event["user_id"]
-        }))
+        pass
+
+    # async def user_offline(self, event):
+    #     await self.send(text_data=json.dumps({
+    #         "event": "user_offline",
+    #         "data": event["user_id"]
+    #     }))
 
     @database_sync_to_async
     def get_user_chat_ids(self, user_id):
@@ -385,27 +431,39 @@ class HomeScreenConsumer(AsyncWebsocketConsumer):
         chat_data = []
 
         for chat_id in chat_ids:
-            last_msg = Message.objects.filter(chat_id_id=chat_id).order_by('-created_at').first()
+            last_msg = Message.objects.select_related("sender_id").filter(chat_id_id=chat_id).order_by('-created_at').first()
             if last_msg:
-                other_members = ChatMember.objects.filter(chat_id_id=chat_id).exclude(user_id_id=user_id)
-                member_info = []
-                for m in other_members:
-                    user = User.objects.get(id=m.user_id_id)
-                    member_info.append({
-                        "id": user.id,
-                        "user": user.name,
-                        "is_online": user.is_online
-                    })
+                # other_members = ChatMember.objects.filter(chat_id_id=chat_id).exclude(user_id_id=user_id)
+                # member_info = []
+                # for m in other_members:
+                #     user = User.objects.get(id=m.user_id_id)
+                #     member_info.append({
+                #         "id": user.id,
+                #         "user": user.name,
+                #         "is_online": user.is_online
+                #     })
 
                 unread_messages = Message.objects.filter(chat_id_id=chat_id, receiver_id_id=user_id, is_read=False).count()
 
                 chat_data.append({
                     "chat_id": chat_id,
+                    "name": last_msg.sender_id.name,
                     "last_message": last_msg.message,
                     "unread_messages": unread_messages,
                     "timestamp": str(last_msg.created_at),
                     # "senders": member_info,
                 })
+            else:
+                chat_data.append({
+                "chat_id": chat_id,
+                "last_message": None,
+                "unread_messages": 0,
+                "timestamp": None,
+            })
+        chat_data.sort(
+            key=lambda x: x["timestamp"] or datetime.min,
+            reverse=True
+        )
         return chat_data
     
     @database_sync_to_async
@@ -413,12 +471,12 @@ class HomeScreenConsumer(AsyncWebsocketConsumer):
         from chatapp.models import Message
         Message.objects.filter(id=message_id).update(is_read=True)
 
-    @database_sync_to_async
-    def mark_user_online(self, user_id):
-        from chatapp.models import User
-        User.objects.filter(id=user_id).update(is_online=True)
+    # @database_sync_to_async
+    # def mark_user_online(self, user_id):
+    #     from chatapp.models import User
+    #     User.objects.filter(id=user_id).update(is_online=True)
 
-    @database_sync_to_async
-    def mark_user_offline(self, user_id):
-        from chatapp.models import User
-        User.objects.filter(id=user_id).update(is_online=False)
+    # @database_sync_to_async
+    # def mark_user_offline(self, user_id):
+    #     from chatapp.models import User
+    #     User.objects.filter(id=user_id).update(is_online=False)
