@@ -699,7 +699,20 @@ class GroupViewSet(viewsets.ModelViewSet):
                 "data": None
             }, status=status.HTTP_400_BAD_REQUEST)
         
+        members = list(group.members.all().values_list("id", flat=True))
+        group_id = group.id
         group.delete()
+        
+        channel_layer = get_channel_layer()
+        for member_id in members:
+            async_to_sync(channel_layer.group_send)(
+                f"user_{member_id}",
+                {
+                    "type": "group_deleted",
+                    "chat_id": group_id,
+                }
+            )
+
 
         return Response({
             "status": True,
