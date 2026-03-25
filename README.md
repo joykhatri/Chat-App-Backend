@@ -80,7 +80,6 @@ daphne -p 8000 chatproject.asgi:application
 
 ## 🔑 API Endpoints
 
-### Authentication Module
 | Method | Endpoint                                            | Description                              |
 | ------ | --------------------------------------------------- | ---------------------------------------- |
 | POST   | `/api/register/`                                    | User Registration                        |
